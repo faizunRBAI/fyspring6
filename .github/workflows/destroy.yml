@@ -1,10 +1,10 @@
-name: Destroy fyspring6 Infrastructure
+name: Destroy Infrastructure
 
 on:
   workflow_dispatch:
 
 jobs:
-  terraform-destroy:
+  destroy:
     name: Terraform Destroy
     runs-on: ubuntu-latest
 
@@ -12,6 +12,10 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
+
+    defaults:
+      run:
+        working-directory: terraform
 
     steps:
       - name: Checkout repository
@@ -21,7 +25,6 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        working-directory: terraform
         run: |
           terraform init -reconfigure \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
@@ -29,7 +32,6 @@ jobs:
             -backend-config="key=${{ secrets.PROJECT_NAME }}/terraform.tfstate"
 
       - name: Terraform Destroy
-        working-directory: terraform
         run: |
           terraform destroy -auto-approve \
             -var="public_key=${{ secrets.SSH_PUBLIC_KEY }}" \

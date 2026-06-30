@@ -6,10 +6,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.0"
-    }
   }
 
   backend "s3" {}
@@ -19,7 +15,9 @@ provider "aws" {
   region = var.aws_region
 }
 
-#  Variables 
+# ---------------------------------------------------------------------------
+# Variables
+# ---------------------------------------------------------------------------
 
 variable "aws_region" {
   description = "AWS region"
@@ -28,12 +26,12 @@ variable "aws_region" {
 }
 
 variable "project_name" {
-  description = "Project name used for tagging and naming resources"
+  description = "Project name (used for tagging and naming resources)"
   type        = string
 }
 
 variable "public_key" {
-  description = "SSH public key material for the EC2 key pair"
+  description = "SSH public key material for EC2 key pair"
   type        = string
 }
 
@@ -46,22 +44,26 @@ variable "instance_type" {
 variable "ami_id" {
   description = "AMI ID for the EC2 instance (Ubuntu 22.04 LTS us-east-1)"
   type        = string
-  default     = "ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS, us-east-1
+  default     = "ami-0c7217cdde317cfec"
 }
 
-#  Key Pair 
+# ---------------------------------------------------------------------------
+# Key Pair
+# ---------------------------------------------------------------------------
 
 resource "aws_key_pair" "app" {
-  key_name   = "${var.project_name}-keypair"
+  key_name   = "${var.project_name}-key"
   public_key = var.public_key
 
   tags = {
     Project = var.project_name
-    Name    = "${var.project_name}-keypair"
+    Name    = "${var.project_name}-key"
   }
 }
 
-#  Security Group 
+# ---------------------------------------------------------------------------
+# Security Group
+# ---------------------------------------------------------------------------
 
 resource "aws_security_group" "app" {
   name        = "${var.project_name}-sg"
@@ -84,7 +86,7 @@ resource "aws_security_group" "app" {
   }
 
   egress {
-    description = "All outbound"
+    description = "Allow all outbound"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -97,13 +99,16 @@ resource "aws_security_group" "app" {
   }
 }
 
-#  EC2 Instance 
+# ---------------------------------------------------------------------------
+# EC2 Instance
+# ---------------------------------------------------------------------------
 
 resource "aws_instance" "app" {
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  key_name               = aws_key_pair.app.key_name
-  vpc_security_group_ids = [aws_security_group.app.id]
+  ami                         = var.ami_id
+  instance_type               = var.instance_type
+  key_name                    = aws_key_pair.app.key_name
+  vpc_security_group_ids      = [aws_security_group.app.id]
+  associate_public_ip_address = true
 
   root_block_device {
     volume_size = 20
@@ -116,7 +121,9 @@ resource "aws_instance" "app" {
   }
 }
 
-#  Elastic IP 
+# ---------------------------------------------------------------------------
+# Elastic IP (stable public address)
+# ---------------------------------------------------------------------------
 
 resource "aws_eip" "app" {
   instance = aws_instance.app.id
@@ -128,7 +135,9 @@ resource "aws_eip" "app" {
   }
 }
 
-#  Outputs 
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
 
 output "instance_public_ip" {
   description = "Static public IP of the EC2 instance"
@@ -136,6 +145,11 @@ output "instance_public_ip" {
 }
 
 output "app_url" {
-  description = "Public URL of the deployed application"
+  description = "Public HTTP URL for the application"
   value       = "http://${aws_eip.app.public_ip}"
+}
+
+output "health_url" {
+  description = "Health check URL"
+  value       = "http://${aws_eip.app.public_ip}/health"
 }

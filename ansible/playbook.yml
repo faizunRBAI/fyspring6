@@ -1,5 +1,5 @@
 ---
-- name: Configure EC2 instance and deploy FastAPI app
+- name: Deploy FastAPI application
   hosts: all
   become: true
   gather_facts: true
@@ -7,20 +7,20 @@
   vars:
     app_dir: /opt/app
     venv_dir: /opt/app/.venv
-    app_user: ubuntu
-    gunicorn_bin: /opt/app/.venv/bin/gunicorn
-    gunicorn_workers: 4
-    app_port: 8000
+    app_user: appuser
+    app_group: appuser
+    app_env: "{{ app_env | default('production') }}"
 
   tasks:
-
-    #  System packages 
+    # -----------------------------------------------------------------------
+    # System packages
+    # -----------------------------------------------------------------------
     - name: Update apt cache
       apt:
-        update_cache: yes
+        update_cache: true
         cache_valid_time: 3600
 
-    - name: Install system packages
+    - name: Install required system packages
       apt:
         name:
           - python3.11
@@ -28,91 +28,249 @@
           - python3.11-dev
           - python3-pip
           - nginx
-          - rsync
-          - curl
           - git
+          - curl
+          - build-essential
         state: present
 
-    #  Application directory 
-    - name: Ensure /opt/app directory exists with correct ownership
+    # -----------------------------------------------------------------------
+    # Application user
+    # -----------------------------------------------------------------------
+    - name: Create application group
+      group:
+        name: "{{ app_group }}"
+        state: present
+        system: true
+
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        system: true
+        shell: /usr/sbin/nologin
+        home: "{{ app_dir }}"
+        create_home: false
+
+    # -----------------------------------------------------------------------
+    # Application directory
+    # -----------------------------------------------------------------------
+    - name: Create application directory
       file:
         path: "{{ app_dir }}"
         state: directory
         owner: "{{ app_user }}"
-        group: "{{ app_user }}"
+        group: "{{ app_group }}"
         mode: "0755"
 
-    - name: Ensure /opt/app is owned by app user (recursive)
+    # -----------------------------------------------------------------------
+    # Copy application source files
+    # -----------------------------------------------------------------------
+    - name: Copy requirements.txt
+      copy:
+        src: requirements.txt
+        dest: "{{ app_dir }}/requirements.txt"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Copy main.py (top-level entrypoint)
+      copy:
+        src: main.py
+        dest: "{{ app_dir }}/main.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Create app package directory
       file:
-        path: "{{ app_dir }}"
+        path: "{{ app_dir }}/app"
         state: directory
         owner: "{{ app_user }}"
-        group: "{{ app_user }}"
-        recurse: yes
+        group: "{{ app_group }}"
+        mode: "0755"
 
-    #  Python virtual environment 
-    - name: Create Python 3.11 virtual environment
-      become_user: "{{ app_user }}"
-      command: python3.11 -m venv {{ venv_dir }}
-      args:
-        creates: "{{ venv_dir }}/bin/activate"
+    - name: Copy app/__init__.py
+      copy:
+        src: app/__init__.py
+        dest: "{{ app_dir }}/app/__init__.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Copy app/main.py
+      copy:
+        src: app/main.py
+        dest: "{{ app_dir }}/app/main.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Copy app/config.py
+      copy:
+        src: app/config.py
+        dest: "{{ app_dir }}/app/config.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Create app/routers directory
+      file:
+        path: "{{ app_dir }}/app/routers"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0755"
+
+    - name: Copy app/routers/__init__.py
+      copy:
+        src: app/routers/__init__.py
+        dest: "{{ app_dir }}/app/routers/__init__.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Copy app/routers/health.py
+      copy:
+        src: app/routers/health.py
+        dest: "{{ app_dir }}/app/routers/health.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Copy app/routers/api.py
+      copy:
+        src: app/routers/api.py
+        dest: "{{ app_dir }}/app/routers/api.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Create app/models directory
+      file:
+        path: "{{ app_dir }}/app/models"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0755"
+
+    - name: Copy app/models/__init__.py
+      copy:
+        src: app/models/__init__.py
+        dest: "{{ app_dir }}/app/models/__init__.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Create app/schemas directory
+      file:
+        path: "{{ app_dir }}/app/schemas"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0755"
+
+    - name: Copy app/schemas/__init__.py
+      copy:
+        src: app/schemas/__init__.py
+        dest: "{{ app_dir }}/app/schemas/__init__.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+
+    - name: Check if public/ directory exists locally
+      local_action:
+        module: stat
+        path: public
+      register: public_dir
+      become: false
+
+    - name: Create public directory on server if it exists locally
+      file:
+        path: "{{ app_dir }}/public"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0755"
+      when: public_dir.stat.exists and public_dir.stat.isdir
+
+    - name: Copy public/ directory contents if it exists
+      copy:
+        src: public/
+        dest: "{{ app_dir }}/public/"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0644"
+      when: public_dir.stat.exists and public_dir.stat.isdir
+
+    # -----------------------------------------------------------------------
+    # Python virtual environment
+    # -----------------------------------------------------------------------
+    - name: Create Python virtual environment at /opt/app/.venv
+      command:
+        cmd: python3.11 -m venv {{ venv_dir }}
+        creates: "{{ venv_dir }}/bin/python"
 
     - name: Upgrade pip inside venv
+      command:
+        cmd: "{{ venv_dir }}/bin/pip install --upgrade pip"
       become_user: "{{ app_user }}"
-      command: "{{ venv_dir }}/bin/pip install --upgrade pip"
 
-    - name: Install Python dependencies from requirements.txt (if present)
+    - name: Install application dependencies inside venv
+      command:
+        cmd: "{{ venv_dir }}/bin/pip install -r {{ app_dir }}/requirements.txt"
+        chdir: "{{ app_dir }}"
       become_user: "{{ app_user }}"
-      shell: |
-        if [ -f {{ app_dir }}/requirements.txt ]; then
-          {{ venv_dir }}/bin/pip install -r {{ app_dir }}/requirements.txt
-        else
-          {{ venv_dir }}/bin/pip install \
-            fastapi \
-            uvicorn[standard] \
-            gunicorn \
-            python-multipart \
-            httpx \
-            "aiofiles>=23.0"
-        fi
-      args:
-        executable: /bin/bash
 
-    #  Environment file 
-    - name: Write application .env file
+    - name: Ensure gunicorn and uvicorn workers are installed in venv
+      command:
+        cmd: "{{ venv_dir }}/bin/pip install gunicorn uvicorn[standard]"
       become_user: "{{ app_user }}"
+
+    # -----------------------------------------------------------------------
+    # Environment file
+    # -----------------------------------------------------------------------
+    - name: Render .env file via shell
       shell: |
         cat > {{ app_dir }}/.env << 'ENVEOF'
-        APP_ENV=production
+        APP_ENV={{ app_env }}
         PORT=8000
         HOST=0.0.0.0
         ENVEOF
-      args:
-        executable: /bin/bash
+        chown {{ app_user }}:{{ app_group }} {{ app_dir }}/.env
+        chmod 640 {{ app_dir }}/.env
 
-    #  Systemd service 
-    - name: Create systemd service unit for the app
+    # -----------------------------------------------------------------------
+    # Fix ownership of the entire app directory
+    # -----------------------------------------------------------------------
+    - name: Set ownership of application directory
+      file:
+        path: "{{ app_dir }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        recurse: true
+
+    # -----------------------------------------------------------------------
+    # Systemd service unit
+    # -----------------------------------------------------------------------
+    - name: Deploy systemd service unit for the FastAPI app
       copy:
-        dest: /etc/systemd/system/app.service
+        dest: /etc/systemd/system/fastapi-app.service
         owner: root
         group: root
         mode: "0644"
         content: |
           [Unit]
-          Description=FastAPI application (Gunicorn + UvicornWorker)
+          Description=FastAPI application (gunicorn + uvicorn)
           After=network.target
+          Wants=network-online.target
 
           [Service]
+          Type=exec
           User={{ app_user }}
-          Group={{ app_user }}
+          Group={{ app_group }}
           WorkingDirectory={{ app_dir }}
-          EnvironmentFile=-{{ app_dir }}/.env
-          ExecStart={{ gunicorn_bin }} app.main:app \
-              -k uvicorn.workers.UvicornWorker \
-              -w {{ gunicorn_workers }} \
-              -b 0.0.0.0:{{ app_port }} \
-              --access-logfile - \
-              --error-logfile -
+          EnvironmentFile={{ app_dir }}/.env
+          ExecStart={{ venv_dir }}/bin/gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000
           Restart=always
           RestartSec=5
           StandardOutput=journal
@@ -124,28 +282,36 @@
 
     - name: Reload systemd daemon
       systemd:
-        daemon_reload: yes
+        daemon_reload: true
 
-    - name: Enable and restart app service
+    - name: Enable and start FastAPI application service
       systemd:
-        name: app
-        enabled: yes
+        name: fastapi-app
+        enabled: true
         state: restarted
 
-    #  Nginx configuration 
-    - name: Write Nginx site configuration
+    # -----------------------------------------------------------------------
+    # Nginx configuration
+    # -----------------------------------------------------------------------
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Deploy nginx virtual host configuration
       copy:
-        dest: /etc/nginx/sites-available/app
+        dest: /etc/nginx/sites-available/fastapi-app
         owner: root
         group: root
         mode: "0644"
         content: |
           server {
-              listen 80;
+              listen 80 default_server;
+              listen [::]:80 default_server;
               server_name _;
 
-              access_log /var/log/nginx/app_access.log;
-              error_log  /var/log/nginx/app_error.log;
+              access_log /var/log/nginx/fastapi-app.access.log;
+              error_log  /var/log/nginx/fastapi-app.error.log;
 
               location / {
                   proxy_pass         http://127.0.0.1:8000;
@@ -161,42 +327,38 @@
               }
           }
 
-    - name: Enable Nginx site (symlink to sites-enabled)
+    - name: Enable nginx fastapi-app site
       file:
-        src: /etc/nginx/sites-available/app
-        dest: /etc/nginx/sites-enabled/app
+        src: /etc/nginx/sites-available/fastapi-app
+        dest: /etc/nginx/sites-enabled/fastapi-app
         state: link
-        force: yes
 
-    - name: Remove default Nginx site
-      file:
-        path: /etc/nginx/sites-enabled/default
-        state: absent
-
-    - name: Test Nginx configuration
+    - name: Test nginx configuration
       command: nginx -t
       changed_when: false
 
-    - name: Enable and reload Nginx
+    - name: Enable and restart nginx
       systemd:
         name: nginx
-        enabled: yes
-        state: reloaded
+        enabled: true
+        state: restarted
 
-    #  Health check (on the instance itself) 
-    - name: Wait for Gunicorn to be accepting connections on port 8000
+    # -----------------------------------------------------------------------
+    # Post-deploy health check on the instance itself
+    # -----------------------------------------------------------------------
+    - name: Wait for gunicorn to be listening on port 8000
       wait_for:
         host: 127.0.0.1
-        port: "{{ app_port }}"
-        delay: 5
+        port: 8000
         timeout: 60
+        state: started
 
-    - name: Verify app health endpoint responds on the instance
+    - name: Verify application health endpoint responds (localhost:8000)
       uri:
-        url: "http://localhost:{{ app_port }}/health"
+        url: http://localhost:8000/health
         method: GET
         status_code: 200
-        timeout: 30
+        timeout: 15
       retries: 6
       delay: 5
       register: health_result
