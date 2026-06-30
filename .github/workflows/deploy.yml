@@ -115,6 +115,14 @@ jobs:
             sleep 10
           done
 
+      #  Pre-create app directory so rsync can write into it 
+      - name: Create /opt/app directory on server
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/deploy_key \
+              ubuntu@${SERVER_IP} \
+              "sudo mkdir -p /opt/app && sudo chown ubuntu:ubuntu /opt/app"
+
       #  Install Ansible 
       - name: Install Ansible
         run: |
