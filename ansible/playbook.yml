@@ -67,7 +67,7 @@
     # -----------------------------------------------------------------------
     - name: Copy requirements.txt
       copy:
-        src: requirements.txt
+        src: ../requirements.txt
         dest: "{{ app_dir }}/requirements.txt"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -75,7 +75,7 @@
 
     - name: Copy main.py (top-level entrypoint)
       copy:
-        src: main.py
+        src: ../main.py
         dest: "{{ app_dir }}/main.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -91,7 +91,7 @@
 
     - name: Copy app/__init__.py
       copy:
-        src: app/__init__.py
+        src: ../app/__init__.py
         dest: "{{ app_dir }}/app/__init__.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -99,7 +99,7 @@
 
     - name: Copy app/main.py
       copy:
-        src: app/main.py
+        src: ../app/main.py
         dest: "{{ app_dir }}/app/main.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -107,7 +107,7 @@
 
     - name: Copy app/config.py
       copy:
-        src: app/config.py
+        src: ../app/config.py
         dest: "{{ app_dir }}/app/config.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -123,7 +123,7 @@
 
     - name: Copy app/routers/__init__.py
       copy:
-        src: app/routers/__init__.py
+        src: ../app/routers/__init__.py
         dest: "{{ app_dir }}/app/routers/__init__.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -131,7 +131,7 @@
 
     - name: Copy app/routers/health.py
       copy:
-        src: app/routers/health.py
+        src: ../app/routers/health.py
         dest: "{{ app_dir }}/app/routers/health.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -139,7 +139,7 @@
 
     - name: Copy app/routers/api.py
       copy:
-        src: app/routers/api.py
+        src: ../app/routers/api.py
         dest: "{{ app_dir }}/app/routers/api.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -155,7 +155,7 @@
 
     - name: Copy app/models/__init__.py
       copy:
-        src: app/models/__init__.py
+        src: ../app/models/__init__.py
         dest: "{{ app_dir }}/app/models/__init__.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -171,7 +171,7 @@
 
     - name: Copy app/schemas/__init__.py
       copy:
-        src: app/schemas/__init__.py
+        src: ../app/schemas/__init__.py
         dest: "{{ app_dir }}/app/schemas/__init__.py"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
@@ -180,7 +180,7 @@
     - name: Check if public/ directory exists locally
       local_action:
         module: stat
-        path: public
+        path: "{{ playbook_dir }}/../public"
       register: public_dir
       become: false
 
@@ -195,7 +195,7 @@
 
     - name: Copy public/ directory contents if it exists
       copy:
-        src: public/
+        src: ../public/
         dest: "{{ app_dir }}/public/"
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
